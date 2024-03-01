@@ -6,6 +6,7 @@ import { applyMenuTranslation, observeFactory } from "./MenuTranslate.js";
 export class TUtils {
 	static LOCALE_ID = "AGL.Locale";
 	static LOCALE_ID_LAST = "AGL.LocaleLast";
+	static LOCALE_DATA = "AGL.LocaleData";
 
 	static T = {
 		Menu: {},
@@ -16,16 +17,35 @@ export class TUtils {
 	static ELS = {};
 
 	static setLocale(locale) {
-		localStorage[TUtils.LOCALE_ID_LAST] = localStorage.getItem(TUtils.LOCALE_ID) || "en-US";
+		localStorage[TUtils.LOCALE_ID_LAST] = localStorage.getItem(TUtils.LOCALE_ID) || "zh-CN";
 		localStorage[TUtils.LOCALE_ID] = locale;
-		// TUtils.syncTranslation();
+		localStorage.removeItem(TUtils.LOCALE_DATA);
+		TUtils.syncTranslation();
 		setTimeout(()=>{
 			location.reload();
-		}, 500);
+		}, 2000);
+	}
+
+	static applyTranslation(responseText) {
+		var resp = JSON.parse(responseText);
+		for (var key in TUtils.T) {
+			if (key in resp)
+				TUtils.T[key] = resp[key];
+			else
+				TUtils.T[key] = {};
+		}
+		TUtils.T.Locales = LOCALES;
+		// 合并NodeCategory 到 Menu
+		TUtils.Menu = Object.assign(TUtils.T.Menu, TUtils.T.NodeCategory);
+		// 提取 Node 中 key 到 Menu
+		for (let key in TUtils.T.Nodes) {
+			let node = TUtils.T.Nodes[key];
+			TUtils.Menu[key] = node["title"] || key;
+		}
 	}
 
 	static syncTranslation(OnFinished = () => { }) {
-		var locale = localStorage.getItem(TUtils.LOCALE_ID) || "en-US";
+		var locale = localStorage.getItem(TUtils.LOCALE_ID) || "zh-CN";
 		var url = "./agl/get_translation";
 		var request = new XMLHttpRequest();
 		request.open("post", url);
@@ -35,21 +55,8 @@ export class TUtils {
 			/* XHR对象获取到返回信息后执行 */
 			if (request.status != 200)
 				return;
-			var resp = JSON.parse(request.responseText);
-			for (var key in TUtils.T) {
-				if (key in resp)
-					TUtils.T[key] = resp[key];
-				else
-					TUtils.T[key] = {};
-			}
-			TUtils.T.Locales = LOCALES;
-			// 合并NodeCategory 到 Menu
-			TUtils.Menu = Object.assign(TUtils.T.Menu, TUtils.T.NodeCategory);
-			// 提取 Node 中 key 到 Menu
-			for (let key in TUtils.T.Nodes) {
-				let node = TUtils.T.Nodes[key];
-				TUtils.Menu[key] = node["title"] || key;
-			}
+			localStorage.setItem(TUtils.LOCALE_DATA, request.responseText);
+			TUtils.applyTranslation(request.responseText);
 			OnFinished();
 		};
 	}
@@ -308,7 +315,7 @@ export class TUtils {
 						})]),
 				])
 			},
-			defaultValue: localStorage[id] || "en-US",
+			defaultValue: localStorage[id] || "zh-CN",
 			async onChange(value) {
 				if (!value)
 					return;
@@ -326,7 +333,12 @@ const ext = {
 	name: "AIGODLIKE.Translation",
 	async init(app) {
 		// Any initial setup to run as soon as the page loads
-		TUtils.syncTranslation();
+		const localeData = localStorage.getItem(TUtils.LOCALE_DATA);
+		if (localeData) {
+			TUtils.applyTranslation(localeData);
+		} else {
+			TUtils.syncTranslation();
+		}
 		return;
 
 		var f = app.graphToPrompt;
@@ -391,10 +403,10 @@ const ext = {
 				id: "swlocale-button",
 				textContent: TUtils.T.Menu["Switch Locale"] || "Switch Locale",
 				onclick: () => {
-					var localeLast = localStorage.getItem(TUtils.LOCALE_ID_LAST) || "en-US";
-					var locale = localStorage.getItem(TUtils.LOCALE_ID) || "en-US";
-					if (locale != "en-US" && localeLast != "en-US")
-						localeLast = "en-US";
+					var localeLast = localStorage.getItem(TUtils.LOCALE_ID_LAST) || "zh-CN";
+					var locale = localStorage.getItem(TUtils.LOCALE_ID) || "zh-CN";
+					if (locale != "zh-CN" && localeLast != "zh-CN")
+						localeLast = "zh-CN";
 					if (locale != localeLast) {
 						app.ui.settings.setSettingValue(TUtils.LOCALE_ID, localeLast);
 					}
